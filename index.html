@@ -176,24 +176,20 @@
 
       function initAppSafe(){ try{ initApp(); } catch(err){ addDiag('Startup crashed: '+(err && err.stack || err), false); enableControls(false); } }
 
-      // ===== Preloaded overlays (your two logos, embedded as SVGs) =====
-      // Tall Sora mark (white cloud + eyes + "Sora" on black)
+      // ===== Preloaded overlays (your two logos inlined as SVGs) =====
       const PRE_A_URL = 'data:image/svg+xml;utf8,' + encodeURIComponent(`
         <svg xmlns="http://www.w3.org/2000/svg" width="768" height="1097" viewBox="0 0 768 1097">
           <rect width="100%" height="100%" fill="#000"/>
           <g transform="translate(154,230)">
             <path d="M208 0c62 0 94 30 116 52 22-22 54-52 116-52 99 0 180 80 180 180 0 59-26 104-61 138 35 34 61 79 61 138 0 99-81 180-180 180-62 0-94-30-116-52-22 22-54 52-116 52-99 0-180-81-180-180 0-59 26-104 61-138-35-34-61-79-61-138C28 80 109 0 208 0z" fill="#fff"/>
-            <!-- eyes -->
             <ellipse cx="210" cy="210" rx="58" ry="78" fill="#000"/>
             <ellipse cx="328" cy="220" rx="52" ry="72" fill="#000"/>
             <circle cx="226" cy="190" r="14" fill="#fff"/>
             <circle cx="344" cy="202" r="12" fill="#fff"/>
-            <!-- text -->
             <text x="268" y="355" text-anchor="middle" font-family="Inter,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial" font-size="96" fill="#000">Sora</text>
           </g>
         </svg>`);
 
-      // Wide Sora wordmark (white cloud icon + "Sora"; transparent background)
       const PRE_B_URL = 'data:image/svg+xml;utf8,' + encodeURIComponent(`
         <svg xmlns="http://www.w3.org/2000/svg" width="1352" height="431" viewBox="0 0 1352 431">
           <rect width="100%" height="100%" fill="transparent"/>
@@ -212,7 +208,6 @@
         const canvas = new fabric.Canvas('c',{ preserveObjectStacking:true, backgroundColor:'#000' });
         addDiag('fabric.js ready & canvas constructed');
 
-        // Canvas sizing
         function resizeCanvas(){
           const wrap=document.getElementById('canvasWrap');
           const w=wrap.clientWidth-16;
@@ -223,7 +218,6 @@
         }
         window.addEventListener('resize', resizeCanvas); resizeCanvas();
 
-        // Helpers
         function addShadow(o){ o.set({ shadow:{ color:'rgba(0,0,0,0.6)', blur:25, offsetX:0, offsetY:8 } }); }
         function center(o){ canvas.centerObject(o); o.setCoords(); canvas.setActiveObject(o); canvas.requestRenderAll(); }
         function sizeOverlayByWidth(o, p=0.6){
@@ -234,7 +228,6 @@
           center(o);
         }
 
-        // Background handling (backgroundImage only)
         function setBackgroundFromImage(imgEl){
           canvas.setBackgroundImage(new fabric.Image(imgEl, { originX:'center', originY:'center' }), () => { fitContain(); });
         }
@@ -263,7 +256,6 @@
           window._bg = null; window._bgMode = null;
         }
 
-        // Robust loader for uploads
         const EXT_OK=/(\.(png|jpe?g|webp|gif|bmp|tiff?))$/i;
         function isHeic(f){ return /heic|heif/i.test(f?.type||'') || /(\.heic|\.heif)$/i.test(f?.name||''); }
         function isLikelyImage(f){ if((f?.type||'').startsWith('image/')) return true; if(!f?.type && EXT_OK.test(f?.name||'')) return true; return false; }
@@ -286,10 +278,8 @@
           }catch(err){ onErr('Loader crashed: '+(err.message||err)); }
         }
 
-        // UI
         const byId=(id)=>document.getElementById(id);
 
-        // Background wires
         byId('bgInput').addEventListener('change', e=>{
           const f=e.target.files[0];
           loadImageFromFile(f, el => { window._bg = el; setBackgroundFromImage(el); }, err=> addDiag(err,false));
@@ -306,11 +296,9 @@
         byId('fitCover').onclick=fitCover;
         byId('clearBg').onclick=clearBg;
 
-        // Previews
         byId('preA').src = PRE_A_URL;
         byId('preB').src = PRE_B_URL;
 
-        // Adders
         function addImageURL(url, p=0.6){
           fabric.Image.fromURL(url, img=>{
             addShadow(img);
@@ -336,7 +324,6 @@
           }, { crossOrigin:'anonymous' });
         });
 
-        // Selection tools
         const getSel=()=>canvas.getActiveObject();
         byId('front').onclick=()=>{ const o=getSel(); if(o) o.bringToFront(); canvas.requestRenderAll(); };
         byId('back').onclick =()=>{ const o=getSel(); if(o) o.sendToBack(); canvas.requestRenderAll(); };
@@ -381,7 +368,6 @@
           o.top  = Math.min(bh-halfH,  Math.max(halfH,  o.top));
         });
 
-        // Export
         function downloadSafe(fmt){
           try{
             canvas.discardActiveObject(); canvas.requestRenderAll();
@@ -396,14 +382,12 @@
         byId('dlPNG').onclick = ()=> downloadSafe('png');
         byId('dlJPG').onclick = ()=> downloadSafe('jpeg');
 
-        // Reset
         byId('reset').onclick=()=>{
           canvas.getObjects().slice().forEach(o=>canvas.remove(o));
           clearBg();
           refreshSliders();
         };
 
-        // Enable once everything wired
         enableControls(true);
         addDiag('UI ready');
       }
