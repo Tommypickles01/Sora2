@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Sora 2 Overlay</title>
+  <meta name="description" content="Upload a photo, add overlays, and download your Sora 2 edit." />
+  <style>
+    :root { color-scheme: dark; }
+    html,body{ height:100%; }
+    body{ margin:0; background:#0b0b0f; color:#fff; font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; }
+    .container{ max-width:1100px; margin:0 auto; padding:0 16px; }
+    .row{ display:flex; gap:16px; flex-wrap:wrap; }
+    .col{ flex:1 1 320px; }
+    .panel{ padding:16px; border-radius:16px; border:1px solid rgba(255,255,255,.12); background:rgba(255,255,255,.06); backdrop-filter:saturate(120%) blur(2px); }
+    .btn{ padding:8px 12px; border-radius:12px; background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.12); color:#fff; cursor:pointer; box-shadow:0 6px 14px rgba(0,0,0,.25); }
+    .btn:hover{ background:rgba(255,255,255,.16); }
+    .btn-primary{ background:#fff; color:#000; font-weight:600; }
+    .btn:disabled{ opacity:.5; cursor:not-allowed; }
+    .dropzone{ border:2px dashed rgba(255,255,255,.25); border-radius:12px; padding:12px; font-size:12px; opacity:.85; }
+    .dropzone.drag{ background:rgba(255,255,255,.08); }
+    .checker{ background:#000; border-radius:12px; }
+    #c{ width:100%; background:#000; border-radius:12px; }
+    h1{ font-size:18px; margin:16px 0 8px; font-weight:700; letter-spacing:-.01em; }
+    h2{ font-size:14px; margin:0 0 10px; font-weight:700; }
+    label.inline{ display:inline-flex; align-items:center; gap:8px; cursor:pointer; }
+    input[type="text"], input[type="range"], input[type="file"]{ width:100%; }
+    input[type="text"]{ margin-top:4px; padding:6px 8px; border-radius:8px; background:rgba(255,255,255,.10); border:1px solid rgba(255,255,255,.12); color:#fff; }
+    #diag { padding-left: 18px; }
+    .warn{ color:#ffd17a; font-size:12px; }
+    .muted{ opacity:.8; font-size:12px; }
+    .thumbs{ display:flex; gap:8px; flex-wrap:wrap; margin-top:10px; }
+    .thumbs button{ display:flex; align-items:center; gap:8px; }
+    .thumbs img{ width:28px; height:28px; border-radius:6px; object-fit:cover; border:1px solid rgba(255,255,255,.2); }
+    .controls{ display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
+    .controls label{ font-size:12px; opacity:.9; display:flex; gap:6px; align-items:center; }
+    .seg{ display:flex; gap:6px; flex-wrap:wrap; }
+  </style>
+</head>
+<body>
+  <header class="container" style="padding-top:16px; padding-bottom:8px; display:flex; align-items:center; justify-content:space-between;">
+    <h1>Sora 2 Overlay</h1>
+  </header>
+
+  <main class="container">
+    <div class="row" style="align-items:flex-start;">
+      <section class="col" style="max-width:460px">
+        <div class="panel">
+          <h2>1) Background</h2>
+          <input id="bgInput" type="file" accept="image/*" />
+          <div id="bgDrop" class="dropzone" style="margin-top:10px;">Drag & drop your background image here.</div>
+          <div style="margin-top:10px; display:flex; gap:8px; flex-wrap:wrap;">
+            <button id="fitContain" class="btn" disabled>Fit</button>
+            <button id="fitCover" class="btn" disabled>Fill</button>
+            <button id="clearBg" class="btn" disabled>Clear</button>
+          </div>
+          <p id="fabricWarn" class="warn" style="display:none; margin-top:8px;">Fabric.js failed to load. Check ad/tracker blockers or network. Controls are disabled.</p>
+        </div>
+
+        <div class="panel" style="margin-top:12px;">
+          <h2>2) Overlays (preloaded)</h2>
+          <div class="thumbs">
+            <button id="addLogoA" class="btn" disabled>
+              <img id="preA" alt="">
+              <span>Add Logo A</span>
+            </button>
+            <button id="addLogoB" class="btn" disabled>
+              <img id="preB" alt="">
+              <span>Add Logo B</span>
+            </button>
+            <button id="addSora" class="btn" disabled>Add Sora 2 logo</button>
+            <label class="inline btn">
+              <input id="logoInput" type="file" accept="image/*" style="display:none;"/>
+              <span>Upload overlay</span>
+            </label>
+            <button id="addCaption" class="btn" disabled>Add caption</button>
+          </div>
+          <label style="display:block; font-size:12px; opacity:.85; margin-top:10px;">Caption text
+            <input id="captionText" type="text" value="Can I just say something…" />
+          </label>
+        </div>
+
+        <div class="panel" style="margin-top:12px;">
+          <h2>3) Selection tools</h2>
+          <div class="controls" style="margin-bottom:8px;">
+            <button id="front" class="btn" disabled>Front</button>
+            <button id="back" class="btn" disabled>Back</button>
+            <button id="dup" class="btn" disabled>Duplicate</button>
+            <button id="del" class="btn" disabled>Delete</button>
+            <label class="inline btn"><input id="toggleShadow" type="checkbox" disabled/><span>Shadow</span></label>
+            <label class="inline btn"><input id="lock" type="checkbox" disabled/><span>Lock</span></label>
+          </div>
+          <div class="controls">
+            <label>Opacity <input id="opacity" type="range" min="0" max="1" step="0.01" value="1" disabled /></label>
+            <label>Scale <input id="scale" type="range" min="5" max="300" step="1" value="100" disabled /></label>
+            <label>Rotate <input id="rotate" type="range" min="-180" max="180" step="1" value="0" disabled /></label>
+          </div>
+          <div class="seg" style="margin-top:8px;">
+            <button class="btn" id="size10" disabled>Size 10%</button>
+            <button class="btn" id="size25" disabled>Size 25%</button>
+            <button class="btn" id="size50" disabled>Size 50%</button>
+          </div>
+        </div>
+
+        <div class="panel" style="margin-top:12px;">
+          <h2>4) Export</h2>
+          <div style="display:flex; gap:8px; flex-wrap:wrap;">
+            <button id="dlPNG" class="btn btn-primary" disabled>Download PNG</button>
+            <button id="dlJPG" class="btn" disabled>Download JPG</button>
+            <button id="reset" class="btn" disabled>Reset</button>
+          </div>
+          <details style="margin-top:10px;">
+            <summary>Diagnostics</summary>
+            <ul id="diag"></ul>
+            <p class="muted">If you see "Global error → Script error", a cross-origin script was blocked. The loader below will try 3 CDNs, then surface a readable message.</p>
+          </details>
+        </div>
+      </section>
+
+      <section class="col" style="min-width: min(66vw, 680px);">
+        <div id="canvasWrap" class="checker panel" style="padding:10px;">
+          <canvas id="c"></canvas>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <script>
+    (function(){
+      // ===== Diagnostics =====
+      function addDiag(msg, ok){
+        try { const ul=document.getElementById('diag'); if(ul){ const li=document.createElement('li'); li.textContent=(ok===false?'❌ ':'✅ ')+msg; ul.appendChild(li); } console.log('[diag]', msg); } catch {}
+      }
+      window.addEventListener('error', e=>{
+        const where=(e.filename||'inline')+(e.lineno?(':'+e.lineno):'');
+        addDiag('Global error → '+(e.message||'unknown')+' @ '+where, false);
+      });
+      window.addEventListener('unhandledrejection', e=>{
+        addDiag('Unhandled rejection → '+(e.reason && e.reason.message || e.reason || 'unknown'), false);
+      });
+
+      // ===== Fabric loader (with fallbacks) =====
+      function loadScript(src, onload, onerror){
+        var s=document.createElement('script');
+        s.src=src; s.async=true; s.crossOrigin='anonymous'; s.referrerPolicy='no-referrer';
+        var done=false, to=setTimeout(function(){ if(!done){ done=true; s.remove(); (onerror||function(){ addDiag('Timed out loading: '+src, false); })(); } }, 8000);
+        s.onload=function(){ if(done) return; done=true; clearTimeout(to); onload&&onload(); };
+        s.onerror=function(){ if(done) return; done=true; clearTimeout(to); (onerror||function(){ addDiag('Failed to load: '+src, false); })(); };
+        document.head.appendChild(s);
+      }
+      function enableControls(enable){
+        document.querySelectorAll('button.btn, input[type=range], #toggleShadow, #lock').forEach(el=>{ el.disabled=!enable; });
+      }
+      function ensureFabric(cb){
+        if(window.fabric && window.fabric.Canvas){ addDiag('fabric.js already present'); enableControls(true); return cb(); }
+        var cdns=[
+          'https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.0/fabric.min.js',
+          'https://cdn.jsdelivr.net/npm/fabric@5.3.0/dist/fabric.min.js',
+          'https://unpkg.com/fabric@5.3.0/dist/fabric.min.js'
+        ];
+        (function next(i){
+          if(i>=cdns.length){
+            addDiag('All Fabric CDNs failed — controls disabled. Check network/content blockers.', false);
+            document.getElementById('fabricWarn').style.display='block';
+            enableControls(false); return;
+          }
+          loadScript(cdns[i], function(){
+            addDiag('Loaded Fabric from '+new URL(cdns[i]).host);
+            enableControls(true);
+            try{ cb(); } catch(err){ addDiag('Init error: '+(err.message||err), false); enableControls(false); }
+          }, function(){ addDiag('Could not load '+cdns[i], false); next(i+1); });
+        })(0);
+      }
+      function onReady(fn){ if(document.readyState!=='loading') fn(); else document.addEventListener('DOMContentLoaded', fn); }
+      onReady(function(){ ensureFabric(initAppSafe); });
+
+      function initAppSafe(){ try{ initApp(); } catch(err){ addDiag('Startup crashed: '+(err && err.stack || err), false); enableControls(false); } }
+
+      // ===== Preloaded overlays (your two logos, embedded as SVGs) =====
+      // Tall Sora mark (white cloud + eyes + "Sora" on black)
+      const PRE_A_URL = 'data:image/svg+xml;utf8,' + encodeURIComponent(`
+        <svg xmlns="http://www.w3.org/2000/svg" width="768" height="1097" viewBox="0 0 768 1097">
+          <rect width="100%" height="100%" fill="#000"/>
+          <g transform="translate(154,230)">
+            <path d="M208 0c62 0 94 30 116 52 22-22 54-52 116-52 99 0 180 80 180 180 0 59-26 104-61 138 35 34 61 79 61 138 0 99-81 180-180 180-62 0-94-30-116-52-22 22-54 52-116 52-99 0-180-81-180-180 0-59 26-104 61-138-35-34-61-79-61-138C28 80 109 0 208 0z" fill="#fff"/>
+            <!-- eyes -->
+            <ellipse cx="210" cy="210" rx="58" ry="78" fill="#000"/>
+            <ellipse cx="328" cy="220" rx="52" ry="72" fill="#000"/>
+            <circle cx="226" cy="190" r="14" fill="#fff"/>
+            <circle cx="344" cy="202" r="12" fill="#fff"/>
+            <!-- text -->
+            <text x="268" y="355" text-anchor="middle" font-family="Inter,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial" font-size="96" fill="#000">Sora</text>
+          </g>
+        </svg>`);
+
+      // Wide Sora wordmark (white cloud icon + "Sora"; transparent background)
+      const PRE_B_URL = 'data:image/svg+xml;utf8,' + encodeURIComponent(`
+        <svg xmlns="http://www.w3.org/2000/svg" width="1352" height="431" viewBox="0 0 1352 431">
+          <rect width="100%" height="100%" fill="transparent"/>
+          <g transform="translate(40,52)">
+            <path d="M140 0c42 0 64 20 79 35 15-15 37-35 79-35 67 0 122 55 122 122 0 40-18 71-41 95 23 24 41 55 41 95 0 67-55 122-122 122-42 0-64-20-79-35-15 15-37 35-79 35C73 434 18 379 18 312c0-40 18-71 41-95-23-24-41-55-41-95C18 55 73 0 140 0z" fill="#fff"/>
+            <ellipse cx="142" cy="146" rx="44" ry="58" fill="#000"/>
+            <ellipse cx="224" cy="154" rx="39" ry="52" fill="#000"/>
+            <circle cx="156" cy="132" r="11" fill="#fff"/>
+            <circle cx="236" cy="142" r="10" fill="#fff"/>
+          </g>
+          <text x="420" y="255" font-family="Inter,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial" font-weight="700" font-size="220" fill="#fff">Sora</text>
+        </svg>`);
+
+      // ===== App =====
+      function initApp(){
+        const canvas = new fabric.Canvas('c',{ preserveObjectStacking:true, backgroundColor:'#000' });
+        addDiag('fabric.js ready & canvas constructed');
+
+        // Canvas sizing
+        function resizeCanvas(){
+          const wrap=document.getElementById('canvasWrap');
+          const w=wrap.clientWidth-16;
+          const h=Math.max(420, Math.min(window.innerHeight*0.72, 900));
+          canvas.setWidth(w); canvas.setHeight(h); canvas.requestRenderAll();
+          addDiag('Canvas size '+w+'×'+h);
+          if(window._bg && window._bgMode){ window._bgMode==='contain'?fitContain():fitCover(); }
+        }
+        window.addEventListener('resize', resizeCanvas); resizeCanvas();
+
+        // Helpers
+        function addShadow(o){ o.set({ shadow:{ color:'rgba(0,0,0,0.6)', blur:25, offsetX:0, offsetY:8 } }); }
+        function center(o){ canvas.centerObject(o); o.setCoords(); canvas.setActiveObject(o); canvas.requestRenderAll(); }
+        function sizeOverlayByWidth(o, p=0.6){
+          const ow = (o.width||1) * (o.scaleX||1);
+          const targetW = canvas.getWidth()*p;
+          const k = targetW / ow;
+          o.scaleX = (o.scaleX||1)*k; o.scaleY = (o.scaleY||1)*k;
+          center(o);
+        }
+
+        // Background handling (backgroundImage only)
+        function setBackgroundFromImage(imgEl){
+          canvas.setBackgroundImage(new fabric.Image(imgEl, { originX:'center', originY:'center' }), () => { fitContain(); });
+        }
+        function fitContain(){
+          window._bgMode='contain';
+          if(!canvas.backgroundImage) return;
+          const img = canvas.backgroundImage;
+          const cw=canvas.getWidth(), ch=canvas.getHeight();
+          const w=img.width, h=img.height;
+          const scale=Math.min(cw/w, ch/h);
+          img.set({ left:cw/2, top:ch/2, scaleX:scale, scaleY:scale });
+          canvas.requestRenderAll();
+        }
+        function fitCover(){
+          window._bgMode='cover';
+          if(!canvas.backgroundImage) return;
+          const img = canvas.backgroundImage;
+          const cw=canvas.getWidth(), ch=canvas.getHeight();
+          const w=img.width, h=img.height;
+          const scale=Math.max(cw/w, ch/h);
+          img.set({ left:cw/2, top:ch/2, scaleX:scale, scaleY:scale });
+          canvas.requestRenderAll();
+        }
+        function clearBg(){
+          canvas.setBackgroundImage(null, canvas.renderAll.bind(canvas));
+          window._bg = null; window._bgMode = null;
+        }
+
+        // Robust loader for uploads
+        const EXT_OK=/(\.(png|jpe?g|webp|gif|bmp|tiff?))$/i;
+        function isHeic(f){ return /heic|heif/i.test(f?.type||'') || /(\.heic|\.heif)$/i.test(f?.name||''); }
+        function isLikelyImage(f){ if((f?.type||'').startsWith('image/')) return true; if(!f?.type && EXT_OK.test(f?.name||'')) return true; return false; }
+        function loadImageFromFile(file,onOk,onErr){
+          try{
+            if(!file) return onErr('No file');
+            if(isHeic(file)) return onErr('HEIC not supported');
+            if(!isLikelyImage(file)) return onErr('Not an image (name: '+(file?.name||'unknown')+', type: '+(file?.type||'unknown')+')');
+            const url = URL.createObjectURL(file);
+            const el = new Image();
+            el.onload = ()=>{ try{ URL.revokeObjectURL(url); }catch{}; onOk(el); };
+            el.onerror = ()=>{
+              try{ URL.revokeObjectURL(url); }catch{};
+              const r=new FileReader();
+              r.onload = ()=>{ const el2=new Image(); el2.onload=()=> onOk(el2); el2.onerror=()=> onErr('Image failed to load (dataURL fallback) for '+(file?.name||'file')); el2.src = r.result; };
+              r.onerror = ()=> onErr('Could not read file: '+(file?.name||'unknown'));
+              r.readAsDataURL(file);
+            };
+            el.src = url;
+          }catch(err){ onErr('Loader crashed: '+(err.message||err)); }
+        }
+
+        // UI
+        const byId=(id)=>document.getElementById(id);
+
+        // Background wires
+        byId('bgInput').addEventListener('change', e=>{
+          const f=e.target.files[0];
+          loadImageFromFile(f, el => { window._bg = el; setBackgroundFromImage(el); }, err=> addDiag(err,false));
+        });
+        const drop=byId('bgDrop');
+        ['dragenter','dragover'].forEach(ev=> drop.addEventListener(ev,e=>{ e.preventDefault(); drop.classList.add('drag'); }));
+        ['dragleave','drop'].forEach(ev=> drop.addEventListener(ev,e=>{ e.preventDefault(); drop.classList.remove('drag'); }));
+        drop.addEventListener('drop',e=>{
+          const f=e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+          if(f){ loadImageFromFile(f, el=>{ window._bg=el; setBackgroundFromImage(el); }, err=> addDiag(err,false)); }
+          else { addDiag('No file found in drop', false); }
+        });
+        byId('fitContain').onclick=fitContain;
+        byId('fitCover').onclick=fitCover;
+        byId('clearBg').onclick=clearBg;
+
+        // Previews
+        byId('preA').src = PRE_A_URL;
+        byId('preB').src = PRE_B_URL;
+
+        // Adders
+        function addImageURL(url, p=0.6){
+          fabric.Image.fromURL(url, img=>{
+            addShadow(img);
+            canvas.add(img);
+            sizeOverlayByWidth(img, p);
+          }, { crossOrigin:'anonymous' });
+        }
+        byId('addLogoA').onclick = ()=> addImageURL(PRE_A_URL, 0.45);
+        byId('addLogoB').onclick = ()=> addImageURL(PRE_B_URL, 0.35);
+
+        byId('addSora').onclick=()=>{
+          const svg=`<?xml version='1.0' encoding='UTF-8'?><svg xmlns='http://www.w3.org/2000/svg' width='900' height='300' viewBox='0 0 900 300'><rect width='900' height='300' fill='black'/><g transform='translate(40,60)'><path d='M100 30c30-40 120-40 150 0s40 100 0 140-120 40-150 0-40-100 0-140z' fill='white'/><g transform='translate(90,70)'><ellipse cx='20' cy='20' rx='16' ry='22' fill='black'/><ellipse cx='66' cy='24' rx='14' ry='20' fill='black'/><circle cx='24' cy='16' r='4' fill='white'/><circle cx='70' cy='20' r='4' fill='white'/></g><text x='210' y='115' font-family='Inter,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial' font-size='120' fill='white' font-weight='700'>Sora</text><text x='550' y='115' font-family='Inter,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial' font-size='120' fill='white' font-weight='700'>2</text></g></svg>`;
+          addImageURL('data:image/svg+xml;utf8,'+encodeURIComponent(svg), 0.6);
+        };
+
+        byId('logoInput').addEventListener('change',e=>{
+          const f=e.target.files[0];
+          if(!f) return;
+          const url = URL.createObjectURL(f);
+          fabric.Image.fromURL(url, img=>{
+            try{ URL.revokeObjectURL(url); }catch{}
+            addShadow(img); canvas.add(img); sizeOverlayByWidth(img, 0.5);
+          }, { crossOrigin:'anonymous' });
+        });
+
+        // Selection tools
+        const getSel=()=>canvas.getActiveObject();
+        byId('front').onclick=()=>{ const o=getSel(); if(o) o.bringToFront(); canvas.requestRenderAll(); };
+        byId('back').onclick =()=>{ const o=getSel(); if(o) o.sendToBack(); canvas.requestRenderAll(); };
+        byId('dup').onclick  =()=>{ const o=getSel(); if(o) o.clone(cl=>{ cl.set({ left:o.left+20, top:o.top+20 }); canvas.add(cl); canvas.setActiveObject(cl); canvas.requestRenderAll(); }); };
+        byId('del').onclick  =()=>{ const o=getSel(); if(o) canvas.remove(o); };
+
+        const opacity=byId('opacity');
+        const scale=byId('scale');
+        const rotate=byId('rotate');
+
+        function refreshSliders(){
+          const o=getSel();
+          if(!o){ opacity.value=1; scale.value=100; rotate.value=0; byId('toggleShadow').checked=false; byId('lock').checked=false; return; }
+          opacity.value = (o.opacity!=null?o.opacity:1);
+          const sx = o.scaleX||1;
+          scale.value = Math.round(sx*100);
+          rotate.value = Math.round(o.angle||0);
+          byId('toggleShadow').checked = !!o.shadow;
+          byId('lock').checked = !o.selectable;
+        }
+
+        opacity.addEventListener('input',()=>{ const o=getSel(); if(o){ o.set({ opacity:parseFloat(opacity.value) }); canvas.requestRenderAll(); }});
+        scale.addEventListener('input',()=>{ const o=getSel(); if(o){ o.scale(parseFloat(scale.value)/100); o.setCoords(); canvas.requestRenderAll(); }});
+        rotate.addEventListener('input',()=>{ const o=getSel(); if(o){ o.rotate(parseFloat(rotate.value)); o.setCoords(); canvas.requestRenderAll(); }});
+
+        byId('toggleShadow').addEventListener('change',e=>{ const o=getSel(); if(o){ if(e.target.checked) addShadow(o); else o.set({ shadow:null }); canvas.requestRenderAll(); }});
+        byId('lock').addEventListener('change',e=>{ const o=getSel(); if(o){ o.set({ selectable:!e.target.checked, evented:!e.target.checked }); canvas.discardActiveObject(); canvas.requestRenderAll(); }});
+
+        function sizeSelTo(p){ const o=getSel(); if(o){ sizeOverlayByWidth(o,p); refreshSliders(); } }
+        byId('size10').onclick = ()=> sizeSelTo(0.10);
+        byId('size25').onclick = ()=> sizeSelTo(0.25);
+        byId('size50').onclick = ()=> sizeSelTo(0.50);
+
+        canvas.on('selection:created', refreshSliders);
+        canvas.on('selection:updated', refreshSliders);
+        canvas.on('selection:cleared', refreshSliders);
+
+        canvas.on('object:moving', function(e){
+          const o=e.target, bw=canvas.getWidth(), bh=canvas.getHeight();
+          const halfW=(o.getScaledWidth())/2, halfH=(o.getScaledHeight())/2;
+          o.left = Math.min(bw-halfW, Math.max(halfW, o.left));
+          o.top  = Math.min(bh-halfH,  Math.max(halfH,  o.top));
+        });
+
+        // Export
+        function downloadSafe(fmt){
+          try{
+            canvas.discardActiveObject(); canvas.requestRenderAll();
+            const opts = fmt==='jpeg' ? { format:'jpeg', quality:0.95 } : { format:'png', quality:1 };
+            const data = canvas.toDataURL(opts);
+            const a=document.createElement('a'); a.href=data; a.download = fmt==='jpeg' ? 'overlay.jpg' : 'overlay.png';
+            document.body.appendChild(a); a.click(); a.remove();
+          } catch (err){
+            addDiag('Export blocked: the canvas is tainted by a cross-origin image lacking CORS headers. Use local uploads or CORS-enabled assets.', false);
+          }
+        }
+        byId('dlPNG').onclick = ()=> downloadSafe('png');
+        byId('dlJPG').onclick = ()=> downloadSafe('jpeg');
+
+        // Reset
+        byId('reset').onclick=()=>{
+          canvas.getObjects().slice().forEach(o=>canvas.remove(o));
+          clearBg();
+          refreshSliders();
+        };
+
+        // Enable once everything wired
+        enableControls(true);
+        addDiag('UI ready');
+      }
+    })();
+  </script>
+</body>
+</html>
