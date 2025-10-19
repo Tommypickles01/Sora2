@@ -94,7 +94,7 @@
             <label>Scale <input id="scale" type="range" min="5" max="300" step="1" value="100" disabled /></label>
             <label>Rotate <input id="rotate" type="range" min="-180" max="180" step="1" value="0" disabled /></label>
           </div>
-          <div class="seg" style="margin-top:8px;">
+          <div class="seg" style="margin-top:8px%;">
             <button class="btn" id="size10" disabled>Size 10%</button>
             <button class="btn" id="size25" disabled>Size 25%</button>
             <button class="btn" id="size50" disabled>Size 50%</button>
@@ -176,13 +176,13 @@
       function initAppSafe(){ try{ initApp(); } catch(err){ addDiag('Startup crashed: '+(err && err.stack || err), false); enableControls(false); } }
 
       // ===== Preloaded overlays (your GitHub PNGs via jsDelivr) =====
-const PRE_A_URL = 'https://cdn.jsdelivr.net/gh/Tommypickles01/Sora2@main/IMG_9981.png';
-const PRE_B_URL = 'https://cdn.jsdelivr.net/gh/Tommypickles01/Sora2@main/IMG_9985.png';
-      
+      const PRE_A_URL = 'https://cdn.jsdelivr.net/gh/Tommypickles01/Sora2@main/IMG_9981.png'; // tall PNG
+      const PRE_B_URL = 'https://cdn.jsdelivr.net/gh/Tommypickles01/Sora2@main/IMG_9985.png'; // wide PNG
+
       // ---- Fabric fromURL compatibility (Fabric 4 callback or Fabric 5 Promise) ----
       function fromURLCompat(url, options={}){
-        // If function expects 3 params, it's the legacy callback API
         if (fabric.Image.fromURL.length >= 3){
+          // Legacy callback signature
           return new Promise((resolve, reject)=>{
             try{
               fabric.Image.fromURL(url, img=>{
@@ -233,10 +233,10 @@ const PRE_B_URL = 'https://cdn.jsdelivr.net/gh/Tommypickles01/Sora2@main/IMG_998
           center(o);
         }
 
-        // Background handling
+        // Background handling (default to Fill to avoid black borders)
         function setBackgroundFromImage(imgEl){
           const bg = new fabric.Image(imgEl, { originX:'center', originY:'center' });
-          canvas.setBackgroundImage(bg, () => { fitContain(); });
+          canvas.setBackgroundImage(bg, () => { fitCover(); }); // default: Fill
         }
         function fitContain(){
           window._bgMode='contain';
@@ -414,16 +414,36 @@ const PRE_B_URL = 'https://cdn.jsdelivr.net/gh/Tommypickles01/Sora2@main/IMG_998
           o.top  = Math.min(bh-halfH,  Math.max(halfH,  o.top));
         });
 
-        // Export
+        // ===== High-res export with smart multiplier (and default Fill) =====
         function downloadSafe(fmt){
           try{
-            canvas.discardActiveObject(); canvas.requestRenderAll();
-            const opts = fmt==='jpeg' ? { format:'jpeg', quality:0.95 } : { format:'png', quality:1 };
-            const data = canvas.toDataURL(opts);
-            const a=document.createElement('a'); a.href=data; a.download = fmt==='jpeg' ? 'overlay.jpg' : 'overlay.png';
+            canvas.discardActiveObject();
+            canvas.requestRenderAll();
+
+            // Determine multiplier from background's native pixels (cap 4×)
+            let multiplier = 2; // default bump
+            const bg = canvas.backgroundImage;
+            if (bg && typeof bg.getElement === 'function') {
+              const el = bg.getElement();
+              const nw = el && (el.naturalWidth || el.videoWidth || el.width);
+              const nh = el && (el.naturalHeight || el.videoHeight || el.height);
+              if (nw && nh) {
+                const sx = nw / canvas.getWidth();
+                const sy = nh / canvas.getHeight();
+                multiplier = Math.max(1, Math.min(4, Math.min(sx, sy)));
+              }
+            }
+
+            const opts = fmt === 'jpeg'
+              ? { format:'jpeg', quality:0.95, multiplier }
+              : { format:'png',  quality:1,    multiplier };
+
+            const data = canvas.toDataURL(opts); // may throw if tainted
+            const a=document.createElement('a');
+            a.href=data; a.download = fmt==='jpeg' ? 'overlay.jpg' : 'overlay.png';
             document.body.appendChild(a); a.click(); a.remove();
           } catch (err){
-            addDiag('Export blocked: the canvas is tainted by a cross-origin image lacking CORS headers. Use a CORS-enabled host (jsDelivr, etc.).', false);
+            addDiag('Export blocked: canvas is tainted by cross-origin images without CORS. Use local uploads or a CORS-enabled host (jsDelivr, etc.).', false);
           }
         }
         byId('dlPNG').onclick = ()=> downloadSafe('png');
