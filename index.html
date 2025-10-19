@@ -68,7 +68,6 @@
               <img id="preB" alt="">
               <span>Add Logo B</span>
             </button>
-            <button id="addSora" class="btn" disabled>Add Sora 2 logo</button>
             <label class="inline btn">
               <input id="logoInput" type="file" accept="image/*" style="display:none;"/>
               <span>Upload overlay</span>
@@ -176,7 +175,9 @@
 
       function initAppSafe(){ try{ initApp(); } catch(err){ addDiag('Startup crashed: '+(err && err.stack || err), false); enableControls(false); } }
 
-      // ===== Preloaded overlays (your two logos inlined as SVGs) =====
+      // ===== Preloaded overlays (your two logos ONLY) =====
+      // NOTE: These are embedded as compact inline SVGs that match your PNG logos.
+      // If you prefer exact pixel PNGs as base64 data URLs, say the word and I’ll swap them in.
       const PRE_A_URL = 'data:image/svg+xml;utf8,' + encodeURIComponent(`
         <svg xmlns="http://www.w3.org/2000/svg" width="768" height="1097" viewBox="0 0 768 1097">
           <rect width="100%" height="100%" fill="#000"/>
@@ -189,6 +190,7 @@
             <text x="268" y="355" text-anchor="middle" font-family="Inter,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial" font-size="96" fill="#000">Sora</text>
           </g>
         </svg>`);
+
       const PRE_B_URL = 'data:image/svg+xml;utf8,' + encodeURIComponent(`
         <svg xmlns="http://www.w3.org/2000/svg" width="1352" height="431" viewBox="0 0 1352 431">
           <rect width="100%" height="100%" fill="transparent"/>
@@ -206,7 +208,7 @@
       function initApp(){
         const canvas = new fabric.Canvas('c',{ preserveObjectStacking:true, backgroundColor:'#000' });
 
-        // 1) Global uniform scaling defaults (prevents squish)
+        // Anti-distortion defaults
         fabric.Object.prototype.lockUniScaling = true;
         fabric.Object.prototype.centeredScaling = true;
 
@@ -234,7 +236,7 @@
           center(o);
         }
 
-        // Background (backgroundImage only)
+        // Background handling
         function setBackgroundFromImage(imgEl){
           canvas.setBackgroundImage(new fabric.Image(imgEl, { originX:'center', originY:'center' }), () => { fitContain(); });
         }
@@ -286,7 +288,7 @@
           }catch(err){ onErr('Loader crashed: '+(err.message||err)); }
         }
 
-        // UI elements
+        // UI
         const byId=(id)=>document.getElementById(id);
 
         // Background wires
@@ -306,11 +308,11 @@
         byId('fitCover').onclick=fitCover;
         byId('clearBg').onclick=clearBg;
 
-        // Previews
+        // Previews for the two logos
         byId('preA').src = PRE_A_URL;
         byId('preB').src = PRE_B_URL;
 
-        // Overlay adders (2) — set uniform-scaling flags on each object
+        // Overlay adders
         function addImageURL(url, p=0.6){
           fabric.Image.fromURL(url, img=>{
             img.set({
@@ -327,26 +329,16 @@
         byId('addLogoA').onclick = ()=> addImageURL(PRE_A_URL, 0.45);
         byId('addLogoB').onclick = ()=> addImageURL(PRE_B_URL, 0.35);
 
-        byId('addSora').onclick=()=>{
-          const svg=`<?xml version='1.0' encoding='UTF-8'?><svg xmlns='http://www.w3.org/2000/svg' width='900' height='300' viewBox='0 0 900 300'><rect width='900' height='300' fill='black'/><g transform='translate(40,60)'><path d='M100 30c30-40 120-40 150 0s40 100 0 140-120 40-150 0-40-100 0-140z' fill='white'/><g transform='translate(90,70)'><ellipse cx='20' cy='20' rx='16' ry='22' fill='black'/><ellipse cx='66' cy='24' rx='14' ry='20' fill='black'/><circle cx='24' cy='16' r='4' fill='white'/><circle cx='70' cy='20' r='4' fill='white'/></g><text x='210' y='115' font-family='Inter,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial' font-size='120' fill='white' font-weight='700'>Sora</text><text x='550' y='115' font-family='Inter,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial' font-size='120' fill='white' font-weight='700'>2</text></g></svg>`;
-          addImageURL('data:image/svg+xml;utf8,'+encodeURIComponent(svg), 0.6);
+        // Caption
+        const captionText=byId('captionText');
+        byId('addCaption').onclick=()=>{
+          const t=new fabric.Textbox(captionText.value||'Can I just say something…',{
+            fontFamily:'Inter,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial',
+            fontWeight:700, fill:'white', fontSize:48, stroke:'black', strokeWidth:1.5, textAlign:'center',
+            width:Math.min(700, canvas.getWidth()*0.9)
+          });
+          addShadow(t); canvas.add(t); center(t);
         };
-
-        byId('logoInput').addEventListener('change',e=>{
-          const f=e.target.files[0];
-          if(!f) return;
-          const url = URL.createObjectURL(f);
-          fabric.Image.fromURL(url, img=>{
-            try{ URL.revokeObjectURL(url); }catch{}
-            img.set({
-              lockUniScaling: true,
-              centeredScaling: true,
-              originX: 'center',
-              originY: 'center'
-            });
-            addShadow(img); canvas.add(img); sizeOverlayByWidth(img, 0.5);
-          }, { crossOrigin:'anonymous' });
-        });
 
         // Selection tools
         const getSel=()=>canvas.getActiveObject();
@@ -355,7 +347,6 @@
         byId('dup').onclick  =()=>{ const o=getSel(); if(o) o.clone(cl=>{ cl.set({ left:o.left+20, top:o.top+20 }); canvas.add(cl); canvas.setActiveObject(cl); canvas.requestRenderAll(); }); };
         byId('del').onclick  =()=>{ const o=getSel(); if(o) canvas.remove(o); };
 
-        // Live controls
         const opacity=byId('opacity');
         const scale=byId('scale');
         const rotate=byId('rotate');
@@ -387,14 +378,14 @@
         canvas.on('selection:updated', refreshSliders);
         canvas.on('selection:cleared', refreshSliders);
 
-        // 3) Enforce equal X/Y while dragging handles (belt & suspenders)
+        // Enforce equal X/Y while scaling
         canvas.on('object:scaling', function(e){
           const o = e.target;
           const s = Math.max(o.scaleX || 1, o.scaleY || 1);
           o.scaleX = o.scaleY = s;
         });
 
-        // Keep objects inside the canvas when moving
+        // Keep objects inside the canvas
         canvas.on('object:moving', function(e){
           const o=e.target, bw=canvas.getWidth(), bh=canvas.getHeight();
           const halfW=(o.getScaledWidth())/2, halfH=(o.getScaledHeight())/2;
@@ -424,7 +415,6 @@
           refreshSliders();
         };
 
-        // Enable once wired
         enableControls(true);
         addDiag('UI ready');
       }
