@@ -79,11 +79,12 @@
 </head>
 <body>
 
-  <!-- ===== Loader (video background with synced pulse) ===== -->
+  <!-- ===== Loader with 3 video sources (Pages → jsDelivr → raw) ===== -->
   <div id="loader">
-    <!-- Host on your repo; jsDelivr adds CORS headers for clean export later -->
-    <video autoplay muted loop playsinline>
+    <video id="loaderVideo" autoplay muted loop playsinline>
+      <source src="https://tommypickles01.github.io/Sora2/6b7798cc16a54c73a16e5ddb3b76adf9.mp4" type="video/mp4">
       <source src="https://cdn.jsdelivr.net/gh/Tommypickles01/Sora2@main/6b7798cc16a54c73a16e5ddb3b76adf9.mp4" type="video/mp4">
+      <source src="https://raw.githubusercontent.com/Tommypickles01/Sora2/main/6b7798cc16a54c73a16e5ddb3b76adf9.mp4" type="video/mp4">
     </video>
     <div class="overlay">
       <div class="spinner"></div>
@@ -192,6 +193,16 @@
       window.addEventListener('unhandledrejection', e=>{
         addDiag('Unhandled rejection → '+(e.reason && e.reason.message || e.reason || 'unknown'), false);
       });
+
+      // Log loader video error (helps if a source fails)
+      (function(){
+        const v = document.getElementById('loaderVideo');
+        if (!v) return;
+        v.addEventListener('error', () => {
+          const code = v.error && v.error.code; // 1 aborted, 2 network, 3 decode, 4 not supported
+          addDiag('Loader video failed (code '+ code + '). Tried Pages → jsDelivr → raw.', false);
+        });
+      })();
 
       // ===== Fabric loader (with fallbacks) =====
       function loadScript(src, onload, onerror){
@@ -505,7 +516,7 @@
 
         // ---- Sync loader pulse to video & hide loader on ready ----
         (function syncLoaderPulse(){
-          const vid = document.querySelector('#loader video');
+          const vid = document.getElementById('loaderVideo');
           if (!vid) return;
           function applySync() {
             const root = document.documentElement;
