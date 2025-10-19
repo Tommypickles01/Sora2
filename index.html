@@ -24,7 +24,7 @@
     h1{ font-size:18px; margin:16px 0 8px; font-weight:700; letter-spacing:-.01em; }
     h2{ font-size:14px; margin:0 0 10px; font-weight:700; }
     label.inline{ display:inline-flex; align-items:center; gap:8px; cursor:pointer; }
-    input[type="text"], input[type="range"], input[type="file"]{ width:100%; }
+    input[type="Text"], input[type="range"], input[type="file"]{ width:100%; }
     input[type="text"]{ margin-top:4px; padding:6px 8px; border-radius:8px; background:rgba(255,255,255,.10); border:1px solid rgba(255,255,255,.12); color:#fff; }
     #diag { padding-left: 18px; }
     .warn{ color:#ffd17a; font-size:12px; }
@@ -189,7 +189,6 @@
             <text x="268" y="355" text-anchor="middle" font-family="Inter,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial" font-size="96" fill="#000">Sora</text>
           </g>
         </svg>`);
-
       const PRE_B_URL = 'data:image/svg+xml;utf8,' + encodeURIComponent(`
         <svg xmlns="http://www.w3.org/2000/svg" width="1352" height="431" viewBox="0 0 1352 431">
           <rect width="100%" height="100%" fill="transparent"/>
@@ -206,8 +205,14 @@
       // ===== App =====
       function initApp(){
         const canvas = new fabric.Canvas('c',{ preserveObjectStacking:true, backgroundColor:'#000' });
+
+        // 1) Global uniform scaling defaults (prevents squish)
+        fabric.Object.prototype.lockUniScaling = true;
+        fabric.Object.prototype.centeredScaling = true;
+
         addDiag('fabric.js ready & canvas constructed');
 
+        // Canvas sizing
         function resizeCanvas(){
           const wrap=document.getElementById('canvasWrap');
           const w=wrap.clientWidth-16;
@@ -218,6 +223,7 @@
         }
         window.addEventListener('resize', resizeCanvas); resizeCanvas();
 
+        // Helpers
         function addShadow(o){ o.set({ shadow:{ color:'rgba(0,0,0,0.6)', blur:25, offsetX:0, offsetY:8 } }); }
         function center(o){ canvas.centerObject(o); o.setCoords(); canvas.setActiveObject(o); canvas.requestRenderAll(); }
         function sizeOverlayByWidth(o, p=0.6){
@@ -228,6 +234,7 @@
           center(o);
         }
 
+        // Background (backgroundImage only)
         function setBackgroundFromImage(imgEl){
           canvas.setBackgroundImage(new fabric.Image(imgEl, { originX:'center', originY:'center' }), () => { fitContain(); });
         }
@@ -256,6 +263,7 @@
           window._bg = null; window._bgMode = null;
         }
 
+        // Robust loader for uploads
         const EXT_OK=/(\.(png|jpe?g|webp|gif|bmp|tiff?))$/i;
         function isHeic(f){ return /heic|heif/i.test(f?.type||'') || /(\.heic|\.heif)$/i.test(f?.name||''); }
         function isLikelyImage(f){ if((f?.type||'').startsWith('image/')) return true; if(!f?.type && EXT_OK.test(f?.name||'')) return true; return false; }
@@ -278,8 +286,10 @@
           }catch(err){ onErr('Loader crashed: '+(err.message||err)); }
         }
 
+        // UI elements
         const byId=(id)=>document.getElementById(id);
 
+        // Background wires
         byId('bgInput').addEventListener('change', e=>{
           const f=e.target.files[0];
           loadImageFromFile(f, el => { window._bg = el; setBackgroundFromImage(el); }, err=> addDiag(err,false));
@@ -296,11 +306,19 @@
         byId('fitCover').onclick=fitCover;
         byId('clearBg').onclick=clearBg;
 
+        // Previews
         byId('preA').src = PRE_A_URL;
         byId('preB').src = PRE_B_URL;
 
+        // Overlay adders (2) — set uniform-scaling flags on each object
         function addImageURL(url, p=0.6){
           fabric.Image.fromURL(url, img=>{
+            img.set({
+              lockUniScaling: true,
+              centeredScaling: true,
+              originX: 'center',
+              originY: 'center'
+            });
             addShadow(img);
             canvas.add(img);
             sizeOverlayByWidth(img, p);
@@ -320,16 +338,24 @@
           const url = URL.createObjectURL(f);
           fabric.Image.fromURL(url, img=>{
             try{ URL.revokeObjectURL(url); }catch{}
+            img.set({
+              lockUniScaling: true,
+              centeredScaling: true,
+              originX: 'center',
+              originY: 'center'
+            });
             addShadow(img); canvas.add(img); sizeOverlayByWidth(img, 0.5);
           }, { crossOrigin:'anonymous' });
         });
 
+        // Selection tools
         const getSel=()=>canvas.getActiveObject();
         byId('front').onclick=()=>{ const o=getSel(); if(o) o.bringToFront(); canvas.requestRenderAll(); };
         byId('back').onclick =()=>{ const o=getSel(); if(o) o.sendToBack(); canvas.requestRenderAll(); };
         byId('dup').onclick  =()=>{ const o=getSel(); if(o) o.clone(cl=>{ cl.set({ left:o.left+20, top:o.top+20 }); canvas.add(cl); canvas.setActiveObject(cl); canvas.requestRenderAll(); }); };
         byId('del').onclick  =()=>{ const o=getSel(); if(o) canvas.remove(o); };
 
+        // Live controls
         const opacity=byId('opacity');
         const scale=byId('scale');
         const rotate=byId('rotate');
@@ -361,6 +387,14 @@
         canvas.on('selection:updated', refreshSliders);
         canvas.on('selection:cleared', refreshSliders);
 
+        // 3) Enforce equal X/Y while dragging handles (belt & suspenders)
+        canvas.on('object:scaling', function(e){
+          const o = e.target;
+          const s = Math.max(o.scaleX || 1, o.scaleY || 1);
+          o.scaleX = o.scaleY = s;
+        });
+
+        // Keep objects inside the canvas when moving
         canvas.on('object:moving', function(e){
           const o=e.target, bw=canvas.getWidth(), bh=canvas.getHeight();
           const halfW=(o.getScaledWidth())/2, halfH=(o.getScaledHeight())/2;
@@ -368,6 +402,7 @@
           o.top  = Math.min(bh-halfH,  Math.max(halfH,  o.top));
         });
 
+        // Export
         function downloadSafe(fmt){
           try{
             canvas.discardActiveObject(); canvas.requestRenderAll();
@@ -382,12 +417,14 @@
         byId('dlPNG').onclick = ()=> downloadSafe('png');
         byId('dlJPG').onclick = ()=> downloadSafe('jpeg');
 
+        // Reset
         byId('reset').onclick=()=>{
           canvas.getObjects().slice().forEach(o=>canvas.remove(o));
           clearBg();
           refreshSliders();
         };
 
+        // Enable once wired
         enableControls(true);
         addDiag('UI ready');
       }
