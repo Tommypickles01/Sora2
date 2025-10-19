@@ -213,7 +213,8 @@
 
         // Background handling
         function setBackgroundFromImage(imgEl){
-          canvas.setBackgroundImage(new fabric.Image(imgEl, { originX:'center', originY:'center' }), () => { fitContain(); });
+          const bg = new fabric.Image(imgEl, { originX:'center', originY:'center' });
+          canvas.setBackgroundImage(bg, () => { fitContain(); });
         }
         function fitContain(){
           window._bgMode='contain';
@@ -287,22 +288,45 @@
         document.getElementById('preA').src = PRE_A_URL;
         document.getElementById('preB').src = PRE_B_URL;
 
-        // Overlay adders (no shadow by default to keep pixels clean)
+        // Overlay adders (Fabric v5 Promise API)
         function addImageURL(url, p=0.6){
-          fabric.Image.fromURL(url, img=>{
-            img.set({
-              lockUniScaling: true,
-              centeredScaling: true,
-              originX: 'center',
-              originY: 'center',
-              shadow: null
-            });
-            canvas.add(img);
-            sizeOverlayByWidth(img, p);
-          }, { crossOrigin:'anonymous' });
+          fabric.Image.fromURL(url, { crossOrigin:'anonymous' })
+            .then(img => {
+              img.set({
+                lockUniScaling: true,
+                centeredScaling: true,
+                originX: 'center',
+                originY: 'center',
+                shadow: null
+              });
+              canvas.add(img);
+              sizeOverlayByWidth(img, p);
+            })
+            .catch(err => addDiag('fromURL failed: '+(err && err.message || err), false));
         }
         document.getElementById('addLogoA').onclick = ()=> addImageURL(PRE_A_URL, 0.45);
         document.getElementById('addLogoB').onclick = ()=> addImageURL(PRE_B_URL, 0.35);
+
+        // Upload overlay (also use Promise API)
+        document.getElementById('logoInput').addEventListener('change', e=>{
+          const f=e.target.files[0];
+          if(!f) return;
+          const url = URL.createObjectURL(f);
+          fabric.Image.fromURL(url)            // blob: URL; no CORS needed
+            .then(img => {
+              try{ URL.revokeObjectURL(url); }catch{}
+              img.set({
+                lockUniScaling: true,
+                centeredScaling: true,
+                originX: 'center',
+                originY: 'center',
+                shadow: null
+              });
+              canvas.add(img);
+              sizeOverlayByWidth(img, 0.5);
+            })
+            .catch(err => addDiag('Upload fromURL failed: '+(err && err.message || err), false));
+        });
 
         // Caption
         const captionText=byId('captionText');
