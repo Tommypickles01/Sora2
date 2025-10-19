@@ -204,6 +204,29 @@
         });
       })();
 
+      // ===== Loader gating: keep video visible for a minimum time AND until it starts playing =====
+      const LOADER_MIN_MS = 6000; // keep video up for at least 6 seconds
+      const _loaderVideo = document.getElementById('loaderVideo');
+      const _minTimer    = new Promise(res => setTimeout(res, LOADER_MIN_MS));
+      const _videoStart  = new Promise(res => {
+        if (!_loaderVideo) return res(); // no video? don't block
+        if (!_loaderVideo.paused && !_loaderVideo.seeking) return res(); // already playing
+        const onPlay = () => { _loaderVideo.removeEventListener('playing', onPlay); res(); };
+        _loaderVideo.addEventListener('playing', onPlay, { once: true });
+      });
+      let _appReadyResolve;
+      const _appReady = new Promise(res => { _appReadyResolve = res; });
+      function gateHideLoader(){
+        Promise.all([_minTimer, _videoStart, _appReady]).then(() => {
+          const loader = document.getElementById('loader');
+          if (loader) {
+            loader.classList.add('fade');
+            setTimeout(() => loader.remove(), 1000); // match CSS transition
+          }
+        });
+      }
+      gateHideLoader();
+
       // ===== Fabric loader (with fallbacks) =====
       function loadScript(src, onload, onerror){
         var s=document.createElement('script');
@@ -504,17 +527,17 @@
             addDiag('Export blocked: canvas is tainted by cross-origin images without CORS. Use local uploads or a CORS-enabled host (jsDelivr, etc.).', false);
           }
         }
-        byId('dlPNG').onclick = ()=> downloadSafe('png');
-        byId('dlJPG').onclick = ()=> downloadSafe('jpeg');
+        document.getElementById('dlPNG').onclick = ()=> downloadSafe('png');
+        document.getElementById('dlJPG').onclick = ()=> downloadSafe('jpeg');
 
         // Reset
-        byId('reset').onclick=()=>{
+        document.getElementById('reset').onclick=()=>{
           canvas.getObjects().slice().forEach(o=>canvas.remove(o));
           clearBg();
           refreshSliders();
         };
 
-        // ---- Sync loader pulse to video & hide loader on ready ----
+        // ---- Sync loader pulse to video ----
         (function syncLoaderPulse(){
           const vid = document.getElementById('loaderVideo');
           if (!vid) return;
@@ -538,18 +561,10 @@
           vid.addEventListener('timeupdate', ()=>{ if (vid.currentTime < 0.15) applySync(); });
         })();
 
-        function hideLoader() {
-          const loader = document.getElementById('loader');
-          if (loader) {
-            loader.classList.add('fade');
-            setTimeout(() => loader.remove(), 1000);
-          }
-        }
-
-        // All wired
+        // === Signal app readiness to the loader gate ===
         enableControls(true);
         addDiag('UI ready');
-        hideLoader();
+        _appReadyResolve(); // let the gating logic decide when to fade out
       }
     })();
   </script>
