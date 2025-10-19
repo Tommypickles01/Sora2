@@ -5,8 +5,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Sora 2 Overlay</title>
   <meta name="description" content="Upload a photo, add overlays, and download your Sora 2 edit." />
+
+  <!-- ===== Core styles ===== -->
   <style>
-    :root { color-scheme: dark; }
+    :root { color-scheme: dark; --pulsePeriod: 2.4s; }
+
     html,body{ height:100%; }
     body{ margin:0; background:#0b0b0f; color:#fff; font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; }
     .container{ max-width:1100px; margin:0 auto; padding:0 16px; }
@@ -35,9 +38,60 @@
     .controls{ display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
     .controls label{ font-size:12px; opacity:.9; display:flex; gap:6px; align-items:center; }
     .seg{ display:flex; gap:6px; flex-wrap:wrap; }
+
+    /* ===== Loader (video background) ===== */
+    #loader {
+      position: fixed;
+      inset: 0;
+      background: #000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      z-index: 9999;
+      transition: opacity 0.8s ease;
+      overflow: hidden;
+    }
+    #loader.fade { opacity: 0; pointer-events: none; }
+    #loader video{
+      position: absolute; top:0; left:0;
+      width:100%; height:100%; object-fit:cover; z-index:0;
+    }
+    #loader .overlay{ position:relative; z-index:1; text-align:center; color:#fff; }
+    .spinner{
+      width:44px; height:44px;
+      border:4px solid rgba(255,255,255,0.15);
+      border-top-color:#fff; border-radius:50%;
+      margin: 20px auto;
+      animation: spin 1s linear infinite, pulseY var(--pulsePeriod) ease-in-out infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    @keyframes pulseY {
+      0% { transform: translateY(0); opacity:.85; }
+      50% { transform: translateY(-2px); opacity:1; }
+      100% { transform: translateY(0); opacity:.85; }
+    }
+    .pulse { animation: pulseY var(--pulsePeriod) ease-in-out infinite; }
+    @media (prefers-reduced-motion: reduce){
+      .spinner, .pulse { animation: none !important; }
+    }
   </style>
 </head>
 <body>
+
+  <!-- ===== Loader (video background with synced pulse) ===== -->
+  <div id="loader">
+    <!-- Host on your repo; jsDelivr adds CORS headers for clean export later -->
+    <video autoplay muted loop playsinline>
+      <source src="https://cdn.jsdelivr.net/gh/Tommypickles01/Sora2@main/6b7798cc16a54c73a16e5ddb3b76adf9.mp4" type="video/mp4">
+    </video>
+    <div class="overlay">
+      <div class="spinner"></div>
+      <p class="pulse" style="font-size:15px; opacity:.9;">Loading Sora 2 Studio…</p>
+    </div>
+  </div>
+
+  <!-- ===== App UI ===== -->
   <header class="container" style="padding-top:16px; padding-bottom:8px; display:flex; align-items:center; justify-content:space-between;">
     <h1>Sora 2 Overlay</h1>
   </header>
@@ -94,7 +148,7 @@
             <label>Scale <input id="scale" type="range" min="5" max="300" step="1" value="100" disabled /></label>
             <label>Rotate <input id="rotate" type="range" min="-180" max="180" step="1" value="0" disabled /></label>
           </div>
-          <div class="seg" style="margin-top:8px%;">
+          <div class="seg" style="margin-top:8px;">
             <button class="btn" id="size10" disabled>Size 10%</button>
             <button class="btn" id="size25" disabled>Size 25%</button>
             <button class="btn" id="size50" disabled>Size 50%</button>
@@ -124,6 +178,7 @@
     </div>
   </main>
 
+  <!-- ===== App script ===== -->
   <script>
     (function(){
       // ===== Diagnostics =====
@@ -175,29 +230,22 @@
 
       function initAppSafe(){ try{ initApp(); } catch(err){ addDiag('Startup crashed: '+(err && err.stack || err), false); enableControls(false); } }
 
-      // ===== Preloaded overlays (your GitHub PNGs via jsDelivr) =====
-      const PRE_A_URL = 'https://cdn.jsdelivr.net/gh/Tommypickles01/Sora2@main/IMG_9981.png'; // tall PNG
-      const PRE_B_URL = 'https://cdn.jsdelivr.net/gh/Tommypickles01/Sora2@main/IMG_9985.png'; // wide PNG
+      // ===== Preloaded overlays (GitHub via jsDelivr) =====
+      const PRE_A_URL = 'https://cdn.jsdelivr.net/gh/Tommypickles01/Sora2@main/IMG_9981.png'; // tall
+      const PRE_B_URL = 'https://cdn.jsdelivr.net/gh/Tommypickles01/Sora2@main/IMG_9985.png'; // wide
 
       // ---- Fabric fromURL compatibility (Fabric 4 callback or Fabric 5 Promise) ----
       function fromURLCompat(url, options={}){
         if (fabric.Image.fromURL.length >= 3){
-          // Legacy callback signature
           return new Promise((resolve, reject)=>{
-            try{
-              fabric.Image.fromURL(url, img=>{
-                if (img) resolve(img); else reject(new Error('fromURL returned null'));
-              }, options);
-            }catch(e){ reject(e); }
+            try{ fabric.Image.fromURL(url, img=> img?resolve(img):reject(new Error('fromURL returned null')), options); }
+            catch(e){ reject(e); }
           });
         }
-        // Modern Promise API
         try{
           const p = fabric.Image.fromURL(url, options);
           if (p && typeof p.then === 'function') return p;
-        }catch(e){
-          return Promise.reject(e);
-        }
+        }catch(e){ return Promise.reject(e); }
         return Promise.reject(new Error('Unknown Fabric fromURL signature'));
       }
 
@@ -233,10 +281,10 @@
           center(o);
         }
 
-        // Background handling (default to Fill to avoid black borders)
+        // Background handling (default Fill to avoid bars)
         function setBackgroundFromImage(imgEl){
           const bg = new fabric.Image(imgEl, { originX:'center', originY:'center' });
-          canvas.setBackgroundImage(bg, () => { fitCover(); }); // default: Fill
+          canvas.setBackgroundImage(bg, () => { fitCover(); });
         }
         function fitContain(){
           window._bgMode='contain';
@@ -306,7 +354,7 @@
         byId('fitCover').onclick=fitCover;
         byId('clearBg').onclick=clearBg;
 
-        // Previews (use hosted PNGs)
+        // Previews (hosted PNGs)
         document.getElementById('preA').src = PRE_A_URL;
         document.getElementById('preB').src = PRE_B_URL;
 
@@ -414,13 +462,12 @@
           o.top  = Math.min(bh-halfH,  Math.max(halfH,  o.top));
         });
 
-        // ===== High-res export with smart multiplier (and default Fill) =====
+        // ===== High-res export with smart multiplier =====
         function downloadSafe(fmt){
           try{
             canvas.discardActiveObject();
             canvas.requestRenderAll();
 
-            // Determine multiplier from background's native pixels (cap 4×)
             let multiplier = 2; // default bump
             const bg = canvas.backgroundImage;
             if (bg && typeof bg.getElement === 'function') {
@@ -438,7 +485,7 @@
               ? { format:'jpeg', quality:0.95, multiplier }
               : { format:'png',  quality:1,    multiplier };
 
-            const data = canvas.toDataURL(opts); // may throw if tainted
+            const data = canvas.toDataURL(opts);
             const a=document.createElement('a');
             a.href=data; a.download = fmt==='jpeg' ? 'overlay.jpg' : 'overlay.png';
             document.body.appendChild(a); a.click(); a.remove();
@@ -456,8 +503,42 @@
           refreshSliders();
         };
 
+        // ---- Sync loader pulse to video & hide loader on ready ----
+        (function syncLoaderPulse(){
+          const vid = document.querySelector('#loader video');
+          if (!vid) return;
+          function applySync() {
+            const root = document.documentElement;
+            if (Number.isFinite(vid.duration) && vid.duration > 0) {
+              const period = Math.max(1.2, Math.min(6, vid.duration));
+              root.style.setProperty('--pulsePeriod', period + 's');
+            }
+            const offset = vid.currentTime || 0;
+            document.querySelectorAll('#loader .spinner').forEach(el=>{
+              el.style.animationDelay = `0s, -${offset}s`;
+            });
+            document.querySelectorAll('#loader .pulse').forEach(el=>{
+              el.style.animationDelay = `-${offset}s`;
+            });
+          }
+          vid.addEventListener('loadedmetadata', applySync);
+          vid.addEventListener('play', applySync);
+          vid.addEventListener('seeked', applySync);
+          vid.addEventListener('timeupdate', ()=>{ if (vid.currentTime < 0.15) applySync(); });
+        })();
+
+        function hideLoader() {
+          const loader = document.getElementById('loader');
+          if (loader) {
+            loader.classList.add('fade');
+            setTimeout(() => loader.remove(), 1000);
+          }
+        }
+
+        // All wired
         enableControls(true);
         addDiag('UI ready');
+        hideLoader();
       }
     })();
   </script>
