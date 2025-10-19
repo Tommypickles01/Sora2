@@ -175,9 +175,31 @@
 
       function initAppSafe(){ try{ initApp(); } catch(err){ addDiag('Startup crashed: '+(err && err.stack || err), false); enableControls(false); } }
 
-      // ===== Preloaded overlays (exact PNGs hosted via jsDelivr) =====
-      const PRE_A_URL = 'https://cdn.jsdelivr.net/gh/Tommypickle501/Sora2@main/IMG_9981.png'; // tall logo
-      const PRE_B_URL = 'https://cdn.jsdelivr.net/gh/Tommypickle501/Sora2@main/IMG_9985.png'; // wide logo
+      // ===== Preloaded overlays (your GitHub PNGs via jsDelivr) =====
+      const PRE_A_URL = 'https://cdn.jsdelivr.net/gh/Tommypickle501/Sora2@main/IMG_9981.png'; // tall PNG
+      const PRE_B_URL = 'https://cdn.jsdelivr.net/gh/Tommypickle501/Sora2@main/IMG_9985.png'; // wide PNG
+
+      // ---- Fabric fromURL compatibility (Fabric 4 callback or Fabric 5 Promise) ----
+      function fromURLCompat(url, options={}){
+        // If function expects 3 params, it's the legacy callback API
+        if (fabric.Image.fromURL.length >= 3){
+          return new Promise((resolve, reject)=>{
+            try{
+              fabric.Image.fromURL(url, img=>{
+                if (img) resolve(img); else reject(new Error('fromURL returned null'));
+              }, options);
+            }catch(e){ reject(e); }
+          });
+        }
+        // Modern Promise API
+        try{
+          const p = fabric.Image.fromURL(url, options);
+          if (p && typeof p.then === 'function') return p;
+        }catch(e){
+          return Promise.reject(e);
+        }
+        return Promise.reject(new Error('Unknown Fabric fromURL signature'));
+      }
 
       // ===== App =====
       function initApp(){
@@ -288,10 +310,10 @@
         document.getElementById('preA').src = PRE_A_URL;
         document.getElementById('preB').src = PRE_B_URL;
 
-        // Overlay adders (Fabric v5 Promise API)
+        // Overlay adders using compat helper
         function addImageURL(url, p=0.6){
-          fabric.Image.fromURL(url, { crossOrigin:'anonymous' })
-            .then(img => {
+          fromURLCompat(url, { crossOrigin:'anonymous' })
+            .then(img=>{
               img.set({
                 lockUniScaling: true,
                 centeredScaling: true,
@@ -302,18 +324,18 @@
               canvas.add(img);
               sizeOverlayByWidth(img, p);
             })
-            .catch(err => addDiag('fromURL failed: '+(err && err.message || err), false));
+            .catch(err=> addDiag('fromURL failed: '+(err && err.message || err), false));
         }
         document.getElementById('addLogoA').onclick = ()=> addImageURL(PRE_A_URL, 0.45);
         document.getElementById('addLogoB').onclick = ()=> addImageURL(PRE_B_URL, 0.35);
 
-        // Upload overlay (also use Promise API)
+        // Upload overlay (also compat)
         document.getElementById('logoInput').addEventListener('change', e=>{
           const f=e.target.files[0];
           if(!f) return;
           const url = URL.createObjectURL(f);
-          fabric.Image.fromURL(url)            // blob: URL; no CORS needed
-            .then(img => {
+          fromURLCompat(url)
+            .then(img=>{
               try{ URL.revokeObjectURL(url); }catch{}
               img.set({
                 lockUniScaling: true,
@@ -325,7 +347,7 @@
               canvas.add(img);
               sizeOverlayByWidth(img, 0.5);
             })
-            .catch(err => addDiag('Upload fromURL failed: '+(err && err.message || err), false));
+            .catch(err=> addDiag('Upload fromURL failed: '+(err && err.message || err), false));
         });
 
         // Caption
