@@ -175,34 +175,9 @@
 
       function initAppSafe(){ try{ initApp(); } catch(err){ addDiag('Startup crashed: '+(err && err.stack || err), false); enableControls(false); } }
 
-      // ===== Preloaded overlays (your two logos ONLY) =====
-      // NOTE: These are embedded as compact inline SVGs that match your PNG logos.
-      // If you prefer exact pixel PNGs as base64 data URLs, say the word and I’ll swap them in.
-      const PRE_A_URL = 'data:image/svg+xml;utf8,' + encodeURIComponent(`
-        <svg xmlns="http://www.w3.org/2000/svg" width="768" height="1097" viewBox="0 0 768 1097">
-          <rect width="100%" height="100%" fill="#000"/>
-          <g transform="translate(154,230)">
-            <path d="M208 0c62 0 94 30 116 52 22-22 54-52 116-52 99 0 180 80 180 180 0 59-26 104-61 138 35 34 61 79 61 138 0 99-81 180-180 180-62 0-94-30-116-52-22 22-54 52-116 52-99 0-180-81-180-180 0-59 26-104 61-138-35-34-61-79-61-138C28 80 109 0 208 0z" fill="#fff"/>
-            <ellipse cx="210" cy="210" rx="58" ry="78" fill="#000"/>
-            <ellipse cx="328" cy="220" rx="52" ry="72" fill="#000"/>
-            <circle cx="226" cy="190" r="14" fill="#fff"/>
-            <circle cx="344" cy="202" r="12" fill="#fff"/>
-            <text x="268" y="355" text-anchor="middle" font-family="Inter,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial" font-size="96" fill="#000">Sora</text>
-          </g>
-        </svg>`);
-
-      const PRE_B_URL = 'data:image/svg+xml;utf8,' + encodeURIComponent(`
-        <svg xmlns="http://www.w3.org/2000/svg" width="1352" height="431" viewBox="0 0 1352 431">
-          <rect width="100%" height="100%" fill="transparent"/>
-          <g transform="translate(40,52)">
-            <path d="M140 0c42 0 64 20 79 35 15-15 37-35 79-35 67 0 122 55 122 122 0 40-18 71-41 95 23 24 41 55 41 95 0 67-55 122-122 122-42 0-64-20-79-35-15 15-37 35-79 35C73 434 18 379 18 312c0-40 18-71 41-95-23-24-41-55-41-95C18 55 73 0 140 0z" fill="#fff"/>
-            <ellipse cx="142" cy="146" rx="44" ry="58" fill="#000"/>
-            <ellipse cx="224" cy="154" rx="39" ry="52" fill="#000"/>
-            <circle cx="156" cy="132" r="11" fill="#fff"/>
-            <circle cx="236" cy="142" r="10" fill="#fff"/>
-          </g>
-          <text x="420" y="255" font-family="Inter,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial" font-weight="700" font-size="220" fill="#fff">Sora</text>
-        </svg>`);
+      // ===== Preloaded overlays (exact PNGs hosted via jsDelivr) =====
+      const PRE_A_URL = 'https://cdn.jsdelivr.net/gh/Tommypickle501/Sora2@main/IMG_9981.png'; // tall logo
+      const PRE_B_URL = 'https://cdn.jsdelivr.net/gh/Tommypickle501/Sora2@main/IMG_9985.png'; // wide logo
 
       // ===== App =====
       function initApp(){
@@ -308,26 +283,26 @@
         byId('fitCover').onclick=fitCover;
         byId('clearBg').onclick=clearBg;
 
-        // Previews for the two logos
-        byId('preA').src = PRE_A_URL;
-        byId('preB').src = PRE_B_URL;
+        // Previews (use hosted PNGs)
+        document.getElementById('preA').src = PRE_A_URL;
+        document.getElementById('preB').src = PRE_B_URL;
 
-        // Overlay adders
+        // Overlay adders (no shadow by default to keep pixels clean)
         function addImageURL(url, p=0.6){
           fabric.Image.fromURL(url, img=>{
             img.set({
               lockUniScaling: true,
               centeredScaling: true,
               originX: 'center',
-              originY: 'center'
+              originY: 'center',
+              shadow: null
             });
-            addShadow(img);
             canvas.add(img);
             sizeOverlayByWidth(img, p);
           }, { crossOrigin:'anonymous' });
         }
-        byId('addLogoA').onclick = ()=> addImageURL(PRE_A_URL, 0.45);
-        byId('addLogoB').onclick = ()=> addImageURL(PRE_B_URL, 0.35);
+        document.getElementById('addLogoA').onclick = ()=> addImageURL(PRE_A_URL, 0.45);
+        document.getElementById('addLogoB').onclick = ()=> addImageURL(PRE_B_URL, 0.35);
 
         // Caption
         const captionText=byId('captionText');
@@ -337,7 +312,7 @@
             fontWeight:700, fill:'white', fontSize:48, stroke:'black', strokeWidth:1.5, textAlign:'center',
             width:Math.min(700, canvas.getWidth()*0.9)
           });
-          addShadow(t); canvas.add(t); center(t);
+          canvas.add(t); center(t);
         };
 
         // Selection tools
@@ -378,7 +353,7 @@
         canvas.on('selection:updated', refreshSliders);
         canvas.on('selection:cleared', refreshSliders);
 
-        // Enforce equal X/Y while scaling
+        // Enforce equal X/Y while scaling (no squish)
         canvas.on('object:scaling', function(e){
           const o = e.target;
           const s = Math.max(o.scaleX || 1, o.scaleY || 1);
@@ -402,7 +377,7 @@
             const a=document.createElement('a'); a.href=data; a.download = fmt==='jpeg' ? 'overlay.jpg' : 'overlay.png';
             document.body.appendChild(a); a.click(); a.remove();
           } catch (err){
-            addDiag('Export blocked: the canvas is tainted by a cross-origin image lacking CORS headers. Use local uploads or CORS-enabled assets.', false);
+            addDiag('Export blocked: the canvas is tainted by a cross-origin image lacking CORS headers. Use a CORS-enabled host (jsDelivr, etc.).', false);
           }
         }
         byId('dlPNG').onclick = ()=> downloadSafe('png');
